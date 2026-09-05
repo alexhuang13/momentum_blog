@@ -41,14 +41,14 @@ for (const lang of ['en', 'zh']) {
   <a class="skip-link" href="#main">${zh ? '跳转到正文' : 'Skip to article'}</a>
   <div class="progress" id="progress" aria-hidden="true"></div>
   <header class="topbar"><div class="topbar__inner"><a class="brand" href="#top"><span class="brand-mark" aria-hidden="true">m</span>Momentum <span class="brand-sub">/ Scaling laws</span></a>
-    <nav class="topnav" aria-label="${zh ? '文章导航' : 'Article navigation'}"><a class="nav-section" href="#phase-diagram">${zh ? '相图' : 'Phase diagram'}</a><a class="nav-section" href="#experiments">${zh ? '实验' : 'Experiments'}</a><a class="topnav__pill" href="assets/paper.pdf" target="_blank" rel="noopener">${zh ? '论文' : 'Paper'} ↗</a>
+    <nav class="topnav" aria-label="${zh ? '文章导航' : 'Article navigation'}"><a class="nav-section" href="#phase-diagram">${zh ? '相图' : 'Phase diagram'}</a><a class="nav-section" href="#experiments">${zh ? '实验' : 'Experiments'}</a><a class="topnav__pill" href="https://arxiv.org/pdf/2609.02728" target="_blank" rel="noopener">${zh ? '论文' : 'Paper'} ↗</a>
       <div class="lang-switch" role="group" aria-label="${zh ? '语言' : 'Language'}"><a href="index.html" lang="en" ${!zh ? 'class="active" aria-current="page"' : ''}>EN</a><a href="zh.html" lang="zh-CN" ${zh ? 'class="active" aria-current="page"' : ''}>中文</a></div>
       <button id="theme-toggle" class="theme" type="button" aria-label="${zh ? '切换深色模式' : 'Toggle dark mode'}" aria-pressed="false"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15A8 8 0 0 1 9 4a7 7 0 0 0 11 11Z"/></svg></button>
     </nav>
   </div></header>
-  <div id="top" class="page"><aside class="toc" aria-label="${zh ? '目录' : 'Contents'}"><p>${zh ? '本文内容' : 'On this page'}</p><nav>${ids.map((id, i) => `<a href="#${id}"><span>0${i + 1}</span>${labels[i]}</a>`).join('')}</nav><a class="toc-bottom" href="assets/paper.pdf" target="_blank" rel="noopener">${zh ? '阅读论文' : 'Read the paper'} ↗</a></aside>
+  <div id="top" class="page"><aside class="toc" aria-label="${zh ? '目录' : 'Contents'}"><p>${zh ? '本文内容' : 'On this page'}</p><nav>${ids.map((id, i) => `<a href="#${id}"><span>0${i + 1}</span>${labels[i]}</a>`).join('')}</nav><a class="toc-bottom" href="https://arxiv.org/pdf/2609.02728" target="_blank" rel="noopener">${zh ? '阅读论文' : 'Read the paper'} ↗</a></aside>
     <main id="main" class="article">${article}
-      <footer id="cite" class="article-footer"><div class="hero-actions"><a class="hero-action primary" href="assets/paper.pdf" target="_blank" rel="noopener">${zh ? '阅读完整论文' : 'Read the full paper'} ↗</a></div></footer>
+      <footer id="cite" class="article-footer"><div class="hero-actions"><a class="hero-action primary" href="https://arxiv.org/pdf/2609.02728" target="_blank" rel="noopener">${zh ? '阅读完整论文' : 'Read the full paper'} ↗</a></div></footer>
     </main>
   </div>
   <script type="module" src="./script.js"></script>

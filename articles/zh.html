@@ -4,7 +4,7 @@
   <p class="hero__tagline"><span class="polyak">Polyak 扩大临界 batch size，</span><br><span class="nesterov">Nesterov 提高数据效率</span></p>
   <p class="hero__lead">我们以幂律核回归为可分析的模型，研究在 one-pass 训练中，动量何时以及如何改善大 batch 训练。我们首先刻画风险稳定性，然后推导完整风险动力学的缩放规律，最后在固定数据预算下优化最终迭代的风险。</p>
   {{BYLINE}}
-  <div class="hero-actions"><a class="hero-action primary" href="assets/paper.pdf" target="_blank" rel="noopener">阅读论文 <span aria-hidden="true">↗</span></a><a class="hero-action" href="#phase-diagram">Batch-size 相图 <span aria-hidden="true">↓</span></a></div>
+  <div class="hero-actions"><a class="hero-action primary" href="https://arxiv.org/pdf/2609.02728" target="_blank" rel="noopener">阅读论文 <span aria-hidden="true">↗</span></a><a class="hero-action" href="#phase-diagram">Batch-size 相图 <span aria-hidden="true">↓</span></a></div>
   <figure class="paper-figure hero-figure"><a href="assets/figures/intro.pdf" target="_blank" rel="noopener"><img src="assets/figures/intro.svg" width="1500" height="535" alt="理论 batch-size 相图，以及最优调参后的最终超额风险随 batch size 的变化。"/></a><figcaption><b>动量收益对 batch size 的依赖。</b>左图：最优数据缩放指数随 batch 指数 \(b\) 的变化，其中 \(B=D^{b+o(1)}\)。右图：固定数据预算 \(D=2^{14}\)、\((s,\beta)=(0.3,4)\) 时，最优调参后的最终超额风险随 batch size 的变化。数值模拟复现了理论预测的三个区间。<span class="figure-source">论文图 1</span></figcaption></figure>
 </section>
 

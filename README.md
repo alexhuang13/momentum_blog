@@ -6,7 +6,7 @@ Research blog by Jia-Nan Wang, Zixun Huang, Kairui Li, and Lei Wu.
 
 - [English website](https://alexhuang13.github.io/momentum_blog/)
 - [中文版](https://alexhuang13.github.io/momentum_blog/zh.html)
-- [Paper](https://alexhuang13.github.io/momentum_blog/assets/paper.pdf)
+- [Paper](https://arxiv.org/pdf/2609.02728)
 - [Additional public site](https://momentum-scaling-notes.zixunh.chatgpt.site/)
 
 The article follows the manuscript's introduction, risk stability, risk dynamics, data scaling, mechanism, numerical validations, and conclusion. English prose largely retains the manuscript's wording; the Chinese page follows the same text. The layout is adapted from FlowBalance-Blog.
