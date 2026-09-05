@@ -1,0 +1,103 @@
+<section class="hero" aria-labelledby="title">
+  <p class="eyebrow">Momentum · Stability · Scaling laws</p>
+  <h1 id="title">Momentum in<br>large-batch training</h1>
+  <p class="hero__tagline"><span class="polyak">Polyak enlarges the critical batch size,</span><br><span class="nesterov">Nesterov improves data efficiency</span></p>
+  <p class="hero__lead">We study when and how momentum improves large-batch training in the one-pass regime, using power-law kernel regression as a tractable setting. We characterize risk stability, derive scaling laws for the full risk dynamics, and optimize the final-step risk under a fixed data budget.</p>
+  {{BYLINE}}
+  <div class="hero-actions"><a class="hero-action primary" href="assets/paper.pdf" target="_blank" rel="noopener">Read the paper <span aria-hidden="true">↗</span></a><a class="hero-action" href="#phase-diagram">Batch-size phase diagram <span aria-hidden="true">↓</span></a></div>
+  <figure class="paper-figure hero-figure"><a href="assets/figures/intro.pdf" target="_blank" rel="noopener"><img src="assets/figures/intro.svg" width="1500" height="535" alt="Theoretical batch-size phase diagram and best-tuned final excess risk versus batch size."/></a><figcaption><b>Batch-size dependence of momentum benefits.</b> Left: the optimal data-scaling exponent as a function of the batch exponent \(b\), defined by \(B=D^{b+o(1)}\). Right: best-tuned final excess risk versus batch size at fixed data budget \(D=2^{14}\) and \((s,\beta)=(0.3,4)\). The simulation recovers the same qualitative three-regime structure predicted by the theory.<span class="figure-source">Figure 1 of the paper</span></figcaption></figure>
+</section>
+
+<section class="section" id="motivation">
+  <p class="section__label">01</p>
+  <h2>Introduction</h2>
+  <p>Momentum has become a central mechanism in optimizer design for modern large-scale training, underlying popular optimizers such as Adam and Muon. Classical theory views momentum primarily as an acceleration mechanism, quantified through reduced iteration complexity. Yet iteration complexity alone does not fully capture the role of momentum in modern large-scale training, where the optimization regime itself changes as training resources, such as data and hardware memory, scale up.</p>
+  <p>Modern large-scale training, particularly language-model pretraining, often operates in a one-pass training regime. In this regime, the batch size \(B\) controls not only hardware parallelism but also the optimization horizon: under a fixed data budget \(D\), the number of sequential updates is</p>
+  <div class="equation-card">\[T=\frac{D}{B}.\]</div>
+  <p>Larger batches improve hardware utilization and training throughput, but necessarily reduce the number of optimization steps available per data pass. This creates a fundamental tradeoff between hardware efficiency and data efficiency. We therefore ask:</p>
+  <blockquote>Can momentum enable larger batches without sacrificing data efficiency, or even improve data efficiency itself?</blockquote>
+  <p>We address this question for two canonical momentum methods, Polyak and Nesterov, using power-law kernel (PLK) regression as a tractable learning problem. Its infinite-dimensional power-law spectrum spans a broad range of learning timescales, making the effects of momentum across spectral directions analytically accessible. The problem is characterized by two exponents: the capacity exponent \(\beta&gt;1\), which controls the decay of the feature spectrum, and the source exponent \(s&gt;0\), which controls how the target-function energy is distributed across the spectrum.</p>
+  <p>Our analysis first identifies the admissible hyperparameter region through stability analysis, then derives scaling laws for the risk dynamics, and finally optimizes the final-step risk subject to both the stability constraint and the one-pass constraint \(T=D/B\).</p>
+  <details class="theory"><summary>Power-law kernel regression <span aria-hidden="true">+</span></summary><div><div class="math-block">\[\lambda_j\asymp j^{-\beta},\qquad \lambda_j|\theta_j^*|^2\asymp j^{-(1+s\beta)}.\]</div><p>Smaller \(s\) means that more target energy lies in low-curvature, small-eigenvalue directions, making the problem harder to learn. The data-scaling analysis considers constant-order label noise. The batch size, learning rate, and momentum factor may scale with the data budget, while remaining fixed within each training run.</p></div></details>
+</section>
+
+<section class="section" id="stability">
+  <p class="section__label">02</p>
+  <h2>Risk stability</h2>
+  <p>We characterize risk stability through the critical learning rate \(\eta^{\mathrm{crit}}\), the largest learning rate for which the stochastic dynamics remain stable. In the large-batch, high-momentum regime, we obtain the sharp scalings</p>
+  <div class="table-wrap"><table><thead><tr><th>Method</th><th>Critical learning rate</th></tr></thead><tbody><tr><td class="sgd">SGD</td><td>\(\eta_{\mathrm{SGD}}^{\mathrm{crit}}\asymp 1\)</td></tr><tr><td class="polyak">Polyak</td><td>\(\eta_{\mathrm{Polyak}}^{\mathrm{crit}}\asymp\min\{1,B(1-\rho)\}\)</td></tr><tr><td class="nesterov">Nesterov</td><td>\(\eta_{\mathrm{Nesterov}}^{\mathrm{crit}}\asymp\min\{1,B^\beta(1-\rho)\}\)</td></tr></tbody></table></div>
+  <p>Thus, stronger momentum requires a correspondingly larger batch to maintain stability. This compensation scales as \(B\) for Polyak but as \(B^\beta\) for Nesterov. Since \(\beta&gt;1\), Nesterov permits substantially higher momentum in large-batch training.</p>
+</section>
+
+<section class="section" id="dynamics">
+  <p class="section__label">03</p>
+  <h2>Scaling laws for risk dynamics</h2>
+  <p>Within the risk-stable region, we derive sharp scaling laws for the risk dynamics of Polyak and Nesterov. In the high-momentum regime, the risk transitions from an early exponential transient to power-law decay and eventually saturates at a noise floor. Writing \(\eta_\rho:=\eta/(1-\rho)\), after the transient the dominant terms take the form</p>
+  <div class="equation-card">\[\mathcal E_{\mathrm{SGD}}(k)\asymp(k\eta)^{-s}+\frac{\sigma^2\eta}{B},\]</div>
+  <div class="equation-card">\[\mathcal E_{\mathrm{Polyak}}(k)\asymp(k\eta_\rho)^{-s}+\frac{\sigma^2\eta_\rho}{B}.\]</div>
+  <p>Nesterov retains the same accelerated signal term but reduces the noise floor:</p>
+  <div class="equation-card">\[\mathcal E_{\mathrm{Nesterov}}(k)\asymp(k\eta_\rho)^{-s}+\frac{\sigma^2}{B}\min\{\eta_\rho,\eta_\rho^{1/\beta}\}.\]</div>
+  <p>Polyak preserves the SGD signal–noise tradeoff while operating at the enlarged effective learning rate \(\eta_\rho\), whereas Nesterov further suppresses noise accumulation at large \(\eta_\rho\) through the curvature-adaptive damping induced by its look-ahead mechanism.</p>
+  <figure class="paper-figure medium-figure"><a href="assets/figures/dynamics.pdf" target="_blank" rel="noopener"><img src="assets/figures/dynamics.svg" loading="lazy" alt="Empirical and theoretical risk dynamics for Polyak and Nesterov."/></a><figcaption><b>Polyak and Nesterov risk dynamics.</b> Empirical results are shown by thin translucent lines and theoretical predictions by thick solid lines. The theory captures the underdamped transient, power-law decay, and noise floor. The inset confirms the dominant \((1-\rho)^{-1}\) dependence of the predicted transition timescale.<span class="figure-source">Numerical validation of risk dynamics, \((s,\beta)=(0.3,4)\)</span></figcaption></figure>
+</section>
+
+<section class="section" id="phase-diagram">
+  <p class="section__label">04</p>
+  <h2>Optimal data scaling across batch-size regimes</h2>
+  <p>We now optimize the final-step risk using the scaling laws above, subject to the one-pass constraint \(T=D/B\) and the stability constraints. We allow the batch size to grow with the data budget according to \(B=D^{b+o(1)}\), where \(b\in[0,1)\). The optimal data-scaling exponent \(r(b)\) is defined by</p>
+  <div class="equation-card">\[\inf_{(\eta,\rho)\in\mathcal A_B}\mathbb E[\mathcal E(\theta_T)]=D^{-r(b)+o(1)}.\]</div>
+  <p>Here, \(\mathcal A_B\) denotes the admissible hyperparameter region, and \(\rho\) is omitted for SGD. A larger \(r(b)\) indicates better data efficiency at batch-size exponent \(b\). Define the three transition exponents</p>
+  <div class="math-block">\[b_1=\frac{s}{s+1},\qquad b_2=\frac{2s+1/\beta}{2s+1+1/\beta},\qquad b_3=\frac{2s+1}{2s+2}.\]</div>
+  {{EXPLORER}}
+  <p>The three transition exponents play distinct roles: \(b_1\) is the critical batch exponent of SGD and marks the onset of Nesterov’s improvement; \(b_2\) maximizes the Nesterov data-scaling exponent; and \(b_3\) is the critical batch exponent of Polyak.</p>
+  <div class="regime-list">
+    <article><span class="regime-index">I</span><div><h3>Small batch: \(b\leq b_1\)</h3><p>All three methods achieve the same optimal data-scaling exponent, \(s/(s+1)\).</p></div></article>
+    <article><span class="regime-index">II</span><div><h3>Large batch: \(b_1&lt;b&lt;b_3\)</h3><p>Nesterov outperforms Polyak, which in turn outperforms SGD, with Nesterov attaining its best data-scaling exponent at \(b=b_2\).</p></div></article>
+    <article><span class="regime-index">III</span><div><h3>Ultra-large batch: \(b\geq b_3\)</h3><p>Polyak and Nesterov share the exponent \(2s(1-b)\) and outperform SGD, whose exponent is \(s(1-b)\).</p></div></article>
+  </div>
+  <p>Thus, Polyak enlarges the batch-size range over which the best small-batch data scaling is preserved, whereas Nesterov further improves the achievable data-scaling exponent in the large-batch regime.</p>
+  <details class="theory"><summary>Batch-size-dependent data scaling <span aria-hidden="true">+</span></summary><div>
+    <div class="math-block">\[r_{\mathrm{SGD}}(b)=\min\left\{\frac{s}{s+1},s(1-b)\right\},\]</div>
+    <div class="math-block">\[r_{\mathrm{Polyak}}(b)=\min\left\{\frac{s}{s+1},2s(1-b)\right\},\]</div>
+    <div class="math-block">\[r_{\mathrm{Nesterov}}(b)=\begin{cases}\frac{s}{s+1},&amp; b&lt;b_1,\\[2pt]\frac{s(1+(\beta-1)b)}{s\beta+1},&amp; b_1\leq b&lt;b_2,\\[2pt]2s(1-b),&amp; b_2\leq b&lt;1.\end{cases}\]</div>
+    <p>The exponents describe the optimally tuned asymptotic risk, up to subpolynomial factors. See Theorem 6.3 of the paper.</p>
+  </div></details>
+</section>
+
+<section class="section" id="mechanism">
+  <p class="section__label">05</p>
+  <h2>Why momentum helps large-batch training</h2>
+  <p>The batch-size dependence of momentum can be understood through the per-sample effective learning rate,</p>
+  <div class="equation-card">\[\eta_{\mathrm{sample}}:=\frac{\eta_{\mathrm{eff}}}{B},\qquad \eta_{\mathrm{eff}}=\begin{cases}\eta,&amp;\text{SGD},\\[2pt]\eta_\rho:=\eta/(1-\rho),&amp;\text{momentum}.\end{cases}\]</div>
+  <h3 class="subhead" id="polyak">Polyak: the admissible effective learning rate</h3>
+  <p>Ignoring the early transient and using \(T=D/B\), SGD and Polyak obey the same data-level signal–noise tradeoff,</p>
+  <div class="equation-card">\[\mathcal E(D)\asymp(D\eta_{\mathrm{sample}})^{-s}+\sigma^2\eta_{\mathrm{sample}}.\]</div>
+  <p>The difference is the admissible range of the per-sample effective learning rate. The stability condition gives \(\eta_{\mathrm{sample}}\lesssim1/B\) for SGD, whereas Polyak allows \(\eta_{\mathrm{sample}}\lesssim1\). Thus, as the batch size grows, the admissible per-sample effective learning rate of SGD shrinks as \(1/B\), while Polyak can keep it at order one by increasing \(\eta_\rho\) proportionally with \(B\).</p>
+  <p>Polyak therefore extends the SGD signal–noise tradeoff to substantially larger batch sizes without changing its optimum, explaining both the enlarged critical batch size and the unchanged best data-scaling exponent.</p>
+  <h3 class="subhead" id="nesterov">Nesterov: suppression of noise accumulation</h3>
+  <p>The difference between Nesterov and Polyak stems from the curvature-adaptive damping induced by Nesterov’s look-ahead mechanism, which damps sharper directions more strongly. While leaving the asymptotic power-law signal term unchanged at \((k\eta_\rho)^{-s}\), this mechanism suppresses stochastic noise accumulation. When \(\eta_\rho\gg1\), the noise floor scales as \(\sigma^2\eta_\rho/B\) for Polyak and \(\sigma^2\eta_\rho^{1/\beta}/B\) for Nesterov.</p>
+  <p>This improves the signal–noise tradeoff itself and thereby achieves better data efficiency in the large-batch regime. At ultra-large batch sizes, however, the limited number of sequential updates \(T=D/B\) becomes the dominant bottleneck, and the two momentum methods recover the same signal-limited scaling.</p>
+</section>
+
+<section class="section" id="experiments">
+  <p class="section__label">06</p>
+  <h2>Numerical validations</h2>
+  <h3 class="subhead">Batch-size phase diagram at a fixed data budget</h3>
+  <p>We first test the three-regime structure at a finite data budget. We fix \(D=2^{14}\) and, for each batch size \(B\), tune \((\eta,\rho)\) to minimize the final excess risk. At small batch sizes, SGD, Polyak, and Nesterov achieve nearly identical risk. As \(B\) increases, SGD deteriorates first, while Polyak maintains the small-batch performance over a wider range, reflecting its enlarged critical batch size.</p>
+  <p>In the large-batch regime, Nesterov’s risk continues to decrease beyond the best level attained by SGD and Polyak, before eventually increasing at ultra-large batch sizes. Thus, Polyak enlarges the data-efficient batch-size range, while Nesterov further improves data efficiency.</p>
+  <h3 class="subhead">Data-scaling exponents across batch-size regimes</h3>
+  <p>We next test the predicted data-scaling exponents at representative points in each regime. We continue with \((s,\beta)=(0.3,4)\) and choose \(B\asymp1\), \(B\asymp D^{0.4}\), and \(B\asymp D^{0.8}\), representing small batch, large batch, and ultra-large batch, respectively. For each data budget \(D\), we set \((\eta,\rho)\) according to the theoretically prescribed scalings.</p>
+    <div class="result-triptych">
+    <figure class="paper-figure"><span class="plot-heading">Small batch · \(B\asymp1\)</span><a href="assets/figures/small-batch.pdf" target="_blank" rel="noopener"><img src="assets/figures/small-batch.svg" loading="lazy" alt="Small-batch data scaling: SGD, Polyak, and Nesterov follow the same exponent."/></a><figcaption>Nesterov = Polyak = SGD</figcaption></figure>
+    <figure class="paper-figure"><span class="plot-heading">Large batch · \(B\asymp D^{0.4}\)</span><a href="assets/figures/large-batch.pdf" target="_blank" rel="noopener"><img src="assets/figures/large-batch.svg" loading="lazy" alt="Large-batch data scaling: Nesterov has the best exponent, followed by Polyak and SGD."/></a><figcaption>Nesterov &gt; Polyak &gt; SGD</figcaption></figure>
+    <figure class="paper-figure"><span class="plot-heading">Ultra-large · \(B\asymp D^{0.8}\)</span><a href="assets/figures/ultra-batch.pdf" target="_blank" rel="noopener"><img src="assets/figures/ultra-batch.svg" loading="lazy" alt="Ultra-large batch data scaling: the two momentum methods have the same exponent and outperform SGD."/></a><figcaption>Nesterov = Polyak &gt; SGD</figcaption></figure>
+  </div>
+  <p class="figure-note">Markers show empirical final excess risks, while dashed lines indicate the scaling exponents predicted by the theory. The empirical slopes recover the predicted ordering in all three batch-size regimes.</p>
+</section>
+
+<section class="section" id="takeaway">
+  <p class="section__label">07</p>
+  <h2>Conclusion and discussion</h2>
+  <p>We developed a unified analysis of Polyak and Nesterov momentum in large-batch, one-pass training, characterizing their risk stability, risk dynamics, and optimal data scaling. A central conclusion is that the benefit of momentum depends critically on the batch size. At small batch sizes, neither method improves the data-scaling exponent of vanilla SGD. As the batch size grows, Polyak preserves the small-batch optimal data-scaling exponent over a substantially wider range of batch sizes than SGD, whereas Nesterov further improves the data-scaling exponent in the large-batch regime. At ultra-large batch sizes, training becomes limited by the number of sequential updates, and the two momentum methods again exhibit the same signal-limited scaling.</p>
+  <p>Our results suggest that learning rate, batch size, and momentum should be designed jointly rather than tuned in isolation. The stability conditions determine how aggressively momentum can be increased at a given learning rate and batch size, while the scaling laws quantify the resulting tradeoff between faster signal learning and stronger noise accumulation. Extending this framework to time-varying learning rates, batch sizes, and momentum factors could therefore provide principled guidance for jointly scaling and scheduling these hyperparameters in large-scale training.</p>
+</section>
