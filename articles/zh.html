@@ -1,103 +1,148 @@
-<section class="hero" aria-labelledby="title">
-  <p class="eyebrow">动量 · 稳定性 · Scaling laws</p>
-  <h1 id="title">大 batch 训练中的动量</h1>
-  <p class="hero__tagline"><span class="polyak">Polyak 扩大临界 batch size，</span><br><span class="nesterov">Nesterov 提高数据效率</span></p>
-  <p class="hero__lead">我们以幂律核回归为可分析的模型，研究在 one-pass 训练中，动量何时以及如何改善大 batch 训练。我们首先刻画风险稳定性，然后推导完整风险动力学的缩放规律，最后在固定数据预算下优化最终迭代的风险。</p>
+<header class="post-header">
+  <h1 id="title">动量如何帮助大 batch 训练？</h1>
   {{BYLINE}}
-  <div class="hero-actions"><a class="hero-action primary" href="https://arxiv.org/pdf/2609.02728" target="_blank" rel="noopener">阅读论文 <span aria-hidden="true">↗</span></a><a class="hero-action" href="#phase-diagram">Batch-size 相图 <span aria-hidden="true">↓</span></a></div>
-  <figure class="paper-figure hero-figure"><a href="assets/figures/intro.pdf" target="_blank" rel="noopener"><img src="assets/figures/intro.svg" width="1500" height="535" alt="理论 batch-size 相图，以及最优调参后的最终超额风险随 batch size 的变化。"/></a><figcaption><b>动量收益对 batch size 的依赖。</b>左图：最优数据缩放指数随 batch 指数 \(b\) 的变化，其中 \(B=D^{b+o(1)}\)。右图：固定数据预算 \(D=2^{14}\)、\((s,\beta)=(0.3,4)\) 时，最优调参后的最终超额风险随 batch size 的变化。数值模拟复现了理论预测的三个区间。<span class="figure-source">论文图 1</span></figcaption></figure>
-</section>
+  {{POST_META}}
+</header>
+{{CONTENTS}}
+<p>介绍动量时，我们通常会说它能加快梯度下降。但如果每条训练数据只用一次，还有一个值得问的问题：用了动量之后，batch size 能开到多大？</p>
+<p>数据量固定时，batch 越大，参数更新的次数越少。这篇文章用一个简单的回归模型，逐步比较 SGD、Polyak 和 Nesterov 在这件事上的差别。主要结果是：<strong>Polyak 让我们把 batch 开得更大，仍然保持原来的数据效率；Nesterov 则有机会进一步提高数据效率。</strong>要理解这个区别，需要把学习速度和噪声放在一起看。</p>
 
 <section class="section" id="motivation">
-  <p class="section__label">01</p>
-  <h2>引言</h2>
-  <p>动量是现代大规模训练中优化器设计的核心机制之一，Adam 和 Muon 等常用优化器都包含动量。经典理论主要将动量视为加速机制，并通过迭代复杂度的降低来衡量其作用。然而，仅靠迭代复杂度还不足以完整描述动量在现代大规模训练中的作用：随着数据和硬件内存等训练资源的增长，优化所处的训练区间本身也会发生变化。</p>
-  <p>现代大规模训练，特别是语言模型预训练，通常采用 one-pass 训练。在这一设定下，batch size \(B\) 不仅控制硬件并行度，也决定优化的时间范围：给定数据预算 \(D\)，顺序更新次数为</p>
+  <h2>Batch size 和数据预算</h2>
+  <p>假设我们有 \(D\) 条训练数据，每条只用一次。每个 batch 放 \(B\) 条数据，那么更新次数就是</p>
   <div class="equation-card">\[T=\frac{D}{B}.\]</div>
-  <p>更大的 batch 可以提高硬件利用率和训练吞吐量，但也必然减少每轮数据遍历中可用的优化步数。这构成了硬件效率与数据效率之间的基本权衡。因此，我们关注以下问题：</p>
-  <blockquote>动量能否在不损失数据效率的情况下支持更大的 batch，甚至进一步提高数据效率本身？</blockquote>
-  <p>我们以幂律核回归（power-law kernel regression，PLK）为可分析的学习问题，研究 Polyak 和 Nesterov 这两种经典动量方法。其无限维幂律谱覆盖了广泛的学习时间尺度，使得动量在不同谱方向上的作用可以被明确分析。问题由两个指数刻画：容量指数 \(\beta&gt;1\) 控制特征谱的衰减，源指数 \(s&gt;0\) 控制目标函数能量在谱上的分布。</p>
-  <p>我们的分析首先通过稳定性确定允许的超参数区域，然后推导描述风险动力学的缩放规律，最后在稳定性约束与 one-pass 约束 \(T=D/B\) 下优化最终迭代的风险。</p>
-  <details class="theory"><summary>幂律核回归设定 <span aria-hidden="true">+</span></summary><div><div class="math-block">\[\lambda_j\asymp j^{-\beta},\qquad \lambda_j|\theta_j^*|^2\asymp j^{-(1+s\beta)}.\]</div><p>\(s\) 越小，越多目标能量分布在低曲率、小特征值方向，学习问题也就越难。数据缩放分析考虑常数量级的标签噪声。Batch size、学习率和动量系数可以随数据预算变化，但在每次训练过程中保持固定。</p></div></details>
+  <p>比如，100 万条数据，batch size 为 100 时可以更新 1 万步，batch size 为 1,000 时就只剩 1,000 步。数据量没变，模型调整参数的机会却少了很多。</p>
+  <p>大 batch 可以更好地利用并行硬件，但能不能用好这些数据，还要看优化器在剩下的步数里能学到多少。下文中，每次训练的 batch size、学习率和动量都保持固定；当数据预算改变时，我们可以重新选择这些设置。</p>
+  <h3 id="learning-problem">一个有快有慢的学习问题</h3>
+  <p>我们用<strong>幂律核回归</strong>来研究这个问题。模型的预测是 \(f(x;\theta)=\langle\phi(x),\theta\rangle\)，标签则是目标预测加上噪声：</p>
+  <div class="equation-card">\[y=\langle\phi(x),\theta^*\rangle+\epsilon,\qquad \epsilon\sim\mathcal N(0,\sigma^2).\]</div>
+  <p>特征服从高斯分布，协方差记作 \(H\)。沿着它的特征向量来看，特征值 \(\lambda_j\) 表示第 \(j\) 个方向的曲率。特征值大的方向通常学得快，特征值小的方向要花更长时间。这里假设特征谱和目标满足</p>
+  <div class="equation-card">\[\lambda_j\asymp j^{-\beta},\qquad \lambda_j|\theta_j^*|^2\asymp j^{-(1+s\beta)}.\]</div>
+  <p>\(\beta&gt;1\) 控制特征值衰减得多快，\(s&gt;0\) 描述有多少要学的内容落在慢方向上。\(s\) 越小，学习问题越难。符号 \(\asymp\) 表示两边可以相差常数倍，但缩放关系相同。</p>
+  <p>我们衡量的是<em>超额预测风险</em>，也就是从平方误差中去掉无法消除的标签噪声：</p>
+  <div class="equation-card">\[\mathcal E(\theta)=\frac12\sum_j\lambda_j(\theta_j-\theta_j^*)^2.\]</div>
+  <p>下文把它简称为“误差”，用 \(\mathcal E(k)\) 表示更新 \(k\) 步后的期望误差。讨论数据缩放时，\(\sigma^2\) 随数据量增长保持常数量级。</p>
+</section>
+
+<section class="section" id="momentum">
+  <h2>Polyak 和 Nesterov 动量</h2>
+  <p>用 \(g_k(\theta)\) 表示第 \(k\) 步新取的一个 batch 上的平均梯度。普通 SGD 的更新是</p>
+  <div class="equation-card">\[\theta_{k+1}=\theta_k-\eta g_k(\theta_k),\]</div>
+  <p>其中 \(\eta\) 是学习率。动量会把上一步更新的信息加进来。为了方便，把上一步的位移写成 \(v_k=\theta_k-\theta_{k-1}\)。</p>
+  <h3 id="polyak-update">Polyak：把上一步的位移带过来</h3>
+  <p>Polyak 动量也叫 heavy-ball 方法。它先更新位移，再更新参数：</p>
+  <div class="equation-card">\[\begin{aligned}v_{k+1}&amp;=\rho v_k-\eta g_k(\theta_k),\\\theta_{k+1}&amp;=\theta_k+v_{k+1}.\end{aligned}\]</div>
+  <p>\(\rho\in[0,1)\) 控制保留多少之前的位移。如果连续几步的梯度方向比较一致，这些贡献就会累积起来。</p>
+  <h3 id="nesterov-update">Nesterov：往前看一点，再算梯度</h3>
+  <p>Nesterov 用同样的位移先构造一个 look-ahead 点，然后在那个位置计算梯度：</p>
+  <div class="equation-card">\[\begin{aligned}\theta_k^{\mathrm{la}}&amp;=\theta_k+\rho v_k,\\v_{k+1}&amp;=\rho v_k-\eta g_k(\theta_k^{\mathrm{la}}),\\\theta_{k+1}&amp;=\theta_k+v_{k+1}.\end{aligned}\]</div>
+  <p>表面上看，只是计算梯度的位置变了。但在二次问题里，同样的位移会让高曲率方向的梯度变化更多。因此，look-ahead 会改变各个方向受到的阻尼。后面讨论噪声时，这一点会变得很关键。</p>
+  <h3 id="effective-rate">有效学习率从哪里来？</h3>
+  <p>想直观地理解动量更新有多大，可以先假设梯度 \(g\) 近似不变，并从 \(v_0=0\) 开始。把 Polyak 的更新展开：</p>
+  <div class="equation-card">\[v_{k+1}=-\eta\sum_{i=0}^{k}\rho^i g=-\eta\frac{1-\rho^{k+1}}{1-\rho}g.\]</div>
+  <p>等最初的影响消退后，梯度前面的系数近似是 \(\eta/(1-\rho)\)。这就是<strong>有效学习率</strong>的直觉来源：</p>
+  <div class="equation-card">\[\eta_\rho:=\frac{\eta}{1-\rho}.\]</div>
+  <p>梯度不变只是一个帮助理解的例子，实际的随机训练还需要进一步分析。不过，两种动量方法在慢方向上的长期学习，确实都由这个量控制。比如，\(\rho=0.9\) 时，\(\eta_\rho=10\eta\)；\(\rho=0.99\) 时，就变成了 \(100\eta\)。</p>
 </section>
 
 <section class="section" id="stability">
-  <p class="section__label">02</p>
-  <h2>风险稳定性</h2>
-  <p>我们通过临界学习率 \(\eta^{\mathrm{crit}}\) 刻画风险稳定性，即使随机动力学保持稳定的最大学习率。在大 batch、高动量区间，我们得到以下精确缩放关系：</p>
-  <div class="table-wrap"><table><thead><tr><th>方法</th><th>临界学习率</th></tr></thead><tbody><tr><td class="sgd">SGD</td><td>\(\eta_{\mathrm{SGD}}^{\mathrm{crit}}\asymp 1\)</td></tr><tr><td class="polyak">Polyak</td><td>\(\eta_{\mathrm{Polyak}}^{\mathrm{crit}}\asymp\min\{1,B(1-\rho)\}\)</td></tr><tr><td class="nesterov">Nesterov</td><td>\(\eta_{\mathrm{Nesterov}}^{\mathrm{crit}}\asymp\min\{1,B^\beta(1-\rho)\}\)</td></tr></tbody></table></div>
-  <p>因此，更强的动量需要相应更大的 batch 来维持稳定。对于 Polyak，这一补偿作用随 \(B\) 缩放；对于 Nesterov，则随 \(B^\beta\) 缩放。由于 \(\beta&gt;1\)，Nesterov 在大 batch 训练中允许使用显著更高的动量。</p>
+  <h2>学习率要多大，训练才稳？</h2>
+  <p>提高 \(\rho\) 可以增大有效学习率。但在用它加速之前，得先确认误差不会发散。在大 batch、高动量的设定下，最大的稳定学习率有下面的缩放关系：</p>
+  <div class="table-wrap"><table><thead><tr><th>方法</th><th>最大的稳定学习率</th></tr></thead><tbody><tr><td class="sgd">SGD</td><td>\(\eta_{\mathrm{SGD}}^{\mathrm{crit}}\asymp1\)</td></tr><tr><td class="polyak">Polyak</td><td>\(\eta_{\mathrm{Polyak}}^{\mathrm{crit}}\asymp\min\{1,B(1-\rho)\}\)</td></tr><tr><td class="nesterov">Nesterov</td><td>\(\eta_{\mathrm{Nesterov}}^{\mathrm{crit}}\asymp\min\{1,B^\beta(1-\rho)\}\)</td></tr></tbody></table></div>
+  <p>先看 Polyak 那一行。固定 \(\eta\)，让 \(\rho\) 越来越接近一，\(1-\rho\) 就越来越小，需要更大的 batch 来补偿。Nesterov 的补偿项是 \(B^\beta\)，因为 \(\beta&gt;1\)，它能获得更多空间。</p>
+  <p>换成有效学习率来看，Polyak 允许 \(\eta_\rho\lesssim B\)，Nesterov 允许 \(\eta_\rho\lesssim B^\beta\)。这里省略了常数因子，学习率 \(\eta\) 本身也有一个常数量级的上限。这些关系解释了大 batch 为什么能支持更强的动量，但还没有告诉我们，哪个稳定设置学得最好。</p>
 </section>
 
 <section class="section" id="dynamics">
-  <p class="section__label">03</p>
-  <h2>风险动力学的缩放规律</h2>
-  <p>在风险稳定区域内，我们推导了 Polyak 和 Nesterov 风险动力学的精确缩放规律。在高动量区间，风险从早期的指数瞬态过渡到幂律衰减，最终饱和于噪声平台。记 \(\eta_\rho:=\eta/(1-\rho)\)，瞬态消退后的主导项为</p>
-  <div class="equation-card">\[\mathcal E_{\mathrm{SGD}}(k)\asymp(k\eta)^{-s}+\frac{\sigma^2\eta}{B},\]</div>
+  <h2>学习速度和噪声平台</h2>
+  <p>早期过渡阶段结束后，误差主要有两个来源。一部分是模型还没学会的信号，会随着更新次数增加而减小；另一部分来自随机噪声，会留下一个光靠多走几步无法消除的平台。</p>
+  <p>对于 SGD，缩放关系是</p>
+  <div class="equation-card">\[\mathcal E_{\mathrm{SGD}}(k)\asymp\underbrace{(k\eta)^{-s}}_{\text{signal still to learn}}+\underbrace{\frac{\sigma^2\eta}{B}}_{\text{noise floor}}.\]</div>
+  <p>第一项是还没学会的信号，第二项是噪声平台。\(\eta\) 越大，第一项越小，第二项却越大。增大 batch 可以减少每步的噪声，但在固定数据预算下，也会减少总步数。</p>
+  <h3 id="polyak-noise">Polyak 保留了同一个权衡</h3>
+  <p>对于 Polyak，把 \(\eta\) 换成有效学习率 \(\eta_\rho\)：</p>
   <div class="equation-card">\[\mathcal E_{\mathrm{Polyak}}(k)\asymp(k\eta_\rho)^{-s}+\frac{\sigma^2\eta_\rho}{B}.\]</div>
-  <p>Nesterov 保留了相同的加速信号项，但降低了噪声平台：</p>
+  <p>动量加快了学习，也同时抬高了噪声平台。信号和噪声之间的权衡形式没有变，变化的是训练稳定时能用到多大的有效学习率。</p>
+  <h3 id="nesterov-noise">Nesterov 降低了噪声代价</h3>
+  <p>Nesterov 的主要学习项一样，但噪声平台不同：</p>
   <div class="equation-card">\[\mathcal E_{\mathrm{Nesterov}}(k)\asymp(k\eta_\rho)^{-s}+\frac{\sigma^2}{B}\min\{\eta_\rho,\eta_\rho^{1/\beta}\}.\]</div>
-  <p>Polyak 在更大的有效学习率 \(\eta_\rho\) 下保留了 SGD 的信号—噪声权衡；Nesterov 则通过 look-ahead 机制所产生的曲率自适应阻尼，在 \(\eta_\rho\) 较大时进一步抑制噪声累积。</p>
-  <figure class="paper-figure medium-figure"><a href="assets/figures/dynamics.pdf" target="_blank" rel="noopener"><img src="assets/figures/dynamics.svg" loading="lazy" alt="Polyak 与 Nesterov 风险动力学的实验结果和理论预测。"/></a><figcaption><b>Polyak 与 Nesterov 的风险动力学。</b>半透明细线表示实验结果，粗实线表示理论预测。理论刻画了欠阻尼瞬态、幂律衰减和噪声平台。插图验证了预测过渡时间尺度中占主导的 \((1-\rho)^{-1}\) 依赖。<span class="figure-source">风险动力学数值验证，\((s,\beta)=(0.3,4)\)</span></figcaption></figure>
-</section>
-
-<section class="section" id="phase-diagram">
-  <p class="section__label">04</p>
-  <h2>不同 batch-size 区间下的最优数据缩放</h2>
-  <p>接下来，我们利用上述缩放规律，在 one-pass 约束 \(T=D/B\) 和稳定性约束下优化最终迭代的风险。允许 batch size 随数据预算增长，写为 \(B=D^{b+o(1)}\)，其中 \(b\in[0,1)\)。定义最优数据缩放指数 \(r(b)\)：</p>
-  <div class="equation-card">\[\inf_{(\eta,\rho)\in\mathcal A_B}\mathbb E[\mathcal E(\theta_T)]=D^{-r(b)+o(1)}.\]</div>
-  <p>这里，\(\mathcal A_B\) 表示允许的超参数区域，SGD 的优化不包含 \(\rho\)。在给定 batch 指数 \(b\) 时，更大的 \(r(b)\) 表示更好的数据效率。定义三个转变指数：</p>
-  <div class="math-block">\[b_1=\frac{s}{s+1},\qquad b_2=\frac{2s+1/\beta}{2s+1+1/\beta},\qquad b_3=\frac{2s+1}{2s+2}.\]</div>
-  {{EXPLORER}}
-  <p>这三个转变指数具有不同含义：\(b_1\) 是 SGD 的临界 batch 指数，同时标志着 Nesterov 开始改善数据效率；\(b_2\) 使 Nesterov 的数据缩放指数达到最大；\(b_3\) 是 Polyak 的临界 batch 指数。</p>
-  <div class="regime-list">
-    <article><span class="regime-index">I</span><div><h3>小 batch：\(b\leq b_1\)</h3><p>三种方法达到相同的最优数据缩放指数 \(s/(s+1)\)。</p></div></article>
-    <article><span class="regime-index">II</span><div><h3>大 batch：\(b_1&lt;b&lt;b_3\)</h3><p>Nesterov 优于 Polyak，Polyak 优于 SGD；Nesterov 在 \(b=b_2\) 处达到最优数据缩放指数。</p></div></article>
-    <article><span class="regime-index">III</span><div><h3>超大 batch：\(b\geq b_3\)</h3><p>Polyak 和 Nesterov 具有相同的指数 \(2s(1-b)\)，均优于指数为 \(s(1-b)\) 的 SGD。</p></div></article>
-  </div>
-  <p>因此，Polyak 扩大了能够保持小 batch 最优数据缩放的 batch-size 范围，而 Nesterov 在大 batch 区间进一步改善了可达到的数据缩放指数。</p>
-  <details class="theory"><summary>数据缩放指数随 batch size 的变化 <span aria-hidden="true">+</span></summary><div>
-    <div class="math-block">\[r_{\mathrm{SGD}}(b)=\min\left\{\frac{s}{s+1},s(1-b)\right\},\]</div>
-    <div class="math-block">\[r_{\mathrm{Polyak}}(b)=\min\left\{\frac{s}{s+1},2s(1-b)\right\},\]</div>
-    <div class="math-block">\[r_{\mathrm{Nesterov}}(b)=\begin{cases}\frac{s}{s+1},&amp; b&lt;b_1,\\[2pt]\frac{s(1+(\beta-1)b)}{s\beta+1},&amp; b_1\leq b&lt;b_2,\\[2pt]2s(1-b),&amp; b_2\leq b&lt;1.\end{cases}\]</div>
-    <p>这些指数描述最优调参后的渐近风险，忽略次多项式因子。详见论文定理 6.3。</p>
-  </div></details>
+  <p>当 \(\eta_\rho\lesssim1\) 时，它看起来和 Polyak 一样。当 \(\eta_\rho\gg1\) 时，噪声按 \(\eta_\rho^{1/\beta}\) 增长，比 \(\eta_\rho\) 更慢。在这个模型里，look-ahead 对更陡的方向施加更强的阻尼，减少这些方向上的噪声累积，同时保留幂律学习项。</p>
+  <p>因此，Nesterov 可以增大有效学习率，而不用付出同样大的噪声代价。这正是改善数据效率所需要的那一步。</p>
+  <figure class="paper-figure medium-figure"><a href="assets/figures/dynamics.pdf" target="_blank" rel="noopener"><img src="assets/figures/dynamics.svg" loading="lazy" alt="Polyak 与 Nesterov 在训练中的误差，以及对应的理论预测。"/></a><figcaption><b>图 1.</b> 训练中的误差变化，\((s,\beta)=(0.3,4)\)。半透明细线是模拟结果，粗线是理论预测。曲线经历早期过渡、幂律下降，最后到达噪声平台。小图检查了过渡时间对 \((1-\rho)^{-1}\) 的依赖。来源：我们的论文。</figcaption></figure>
 </section>
 
 <section class="section" id="mechanism">
-  <p class="section__label">05</p>
-  <h2>动量为何改善大 batch 训练</h2>
-  <p>动量收益对 batch size 的依赖，可以通过每样本有效学习率来理解：</p>
-  <div class="equation-card">\[\eta_{\mathrm{sample}}:=\frac{\eta_{\mathrm{eff}}}{B},\qquad \eta_{\mathrm{eff}}=\begin{cases}\eta,&amp;\text{SGD},\\[2pt]\eta_\rho:=\eta/(1-\rho),&amp;\text{momentum}.\end{cases}\]</div>
-  <h3 class="subhead" id="polyak">Polyak：允许的有效学习率范围</h3>
-  <p>忽略早期瞬态并代入 \(T=D/B\)，SGD 和 Polyak 满足相同的数据层面信号—噪声权衡：</p>
-  <div class="equation-card">\[\mathcal E(D)\asymp(D\eta_{\mathrm{sample}})^{-s}+\sigma^2\eta_{\mathrm{sample}}.\]</div>
-  <p>两者的差别在于每样本有效学习率的允许范围。稳定性条件对 SGD 给出 \(\eta_{\mathrm{sample}}\lesssim1/B\)，而 Polyak 允许 \(\eta_{\mathrm{sample}}\lesssim1\)。因此，随着 batch size 增大，SGD 允许的每样本有效学习率按 \(1/B\) 缩小；Polyak 则可以通过让 \(\eta_\rho\) 随 \(B\) 成比例增长，将其保持在常数量级。</p>
-  <p>Polyak 因而将 SGD 的信号—噪声权衡延伸到了显著更大的 batch size，而不改变这一权衡的最优值。这同时解释了临界 batch size 的扩大，以及最优数据缩放指数保持不变的原因。</p>
-  <h3 class="subhead" id="nesterov">Nesterov：噪声累积的抑制</h3>
-  <p>Nesterov 与 Polyak 的差别来自 look-ahead 机制诱导的曲率自适应阻尼，它对更陡峭的方向施加更强的阻尼。这一机制保留了渐近幂律信号项 \((k\eta_\rho)^{-s}\)，同时抑制了随机噪声累积。当 \(\eta_\rho\gg1\) 时，Polyak 的噪声平台按 \(\sigma^2\eta_\rho/B\) 缩放，而 Nesterov 按 \(\sigma^2\eta_\rho^{1/\beta}/B\) 缩放。</p>
-  <p>这改善了信号—噪声权衡本身，使 Nesterov 在大 batch 区间达到更好的数据效率。然而，当 batch size 进一步增大时，有限的顺序更新次数 \(T=D/B\) 成为主导瓶颈，两种动量方法重新具有相同的信号受限缩放。</p>
+  <h2>从训练步数算到数据效率</h2>
+  <p>现在可以回到固定数据预算的问题了。把 \(T=D/B\) 代入误差公式，并定义每条样本对应的有效学习率：</p>
+  <div class="equation-card">\[a:=\frac{\eta_{\mathrm{eff}}}{B},\qquad\eta_{\mathrm{eff}}=\begin{cases}\eta,&amp;\text{SGD},\\\eta_\rho,&amp;\text{momentum}.\end{cases}\]</div>
+  <p>比如，batch size 和有效学习率同时翻倍，\(a\) 就保持不变。用这个量，可以更方便地比较同样的数据被分成不同步数来训练时的表现。</p>
+  <h3 id="polyak">为什么 Polyak 能支持更大的 batch？</h3>
+  <p>等早期过渡的影响可以忽略后，SGD 和 Polyak 都满足</p>
+  <div class="equation-card">\[\mathcal E(D)\asymp(Da)^{-s}+\sigma^2a.\]</div>
+  <p>噪声是常数量级，因此最好的选择会让两项达到平衡。先忽略常数因子：</p>
+  <div class="equation-card">\[\begin{aligned}(Da)^{-s}&amp;\asymp a\\a^{s+1}&amp;\asymp D^{-s}\\a_*&amp;\asymp D^{-s/(s+1)},\qquad\mathcal E_*\asymp D^{-s/(s+1)}.\end{aligned}\]</div>
+  <p>对 SGD 来说，稳定性要求 \(a\lesssim1/B\)。想选到这个平衡点，就需要 \(D^{-s/(s+1)}\lesssim1/B\)，也就是</p>
+  <div class="equation-card">\[B\lesssim D^{s/(s+1)}.\]</div>
+  <p>这就是 SGD 的临界 batch 规模。超过它，即使学习率已经开到稳定范围内的最大值，也够不到那个平衡点了。Polyak 的稳定性限制是 \(a\lesssim1\)，空间更大，因此在更大的 batch 下仍然可以达到同样的最优值。</p>
+  <h3 id="finite-steps">为什么步数还是会成为限制？</h3>
+  <p>还有一个条件需要考虑。高动量时，早期过渡大约需要 \((1-\rho)^{-1}\) 步才能消退，另外还有对数修正。对于长度为 \(T\) 的训练，使用长期公式前需要满足 \(T(1-\rho)\gtrsim1\)。</p>
+  <p>结合 \(\eta\lesssim1\)，得到缩放意义下的上限：</p>
+  <div class="equation-card">\[\eta_\rho\lesssim T,\qquad a\lesssim\frac{T}{B}=\frac{D}{B^2}.\]</div>
+  <p>把这个上限和 \(a_*\asymp D^{-s/(s+1)}\) 放在一起。忽略对数因子，Polyak 能保持小 batch 指数的范围是</p>
+  <div class="equation-card">\[D^{-s/(s+1)}\lesssim\frac{D}{B^2}\quad\Longrightarrow\quad B\lesssim D^{(2s+1)/(2s+2)}.\]</div>
+  <p>超过这个规模，步数就不够了。学习项受到 \((T\eta_\rho)^{-s}\gtrsim T^{-2s}\) 的限制。如果 \(B\) 按 \(D^b\) 增长，就会得到后面出现的指数 \(2s(1-b)\)。这几步解释了幂次的来源，论文里会完整处理过渡阶段和对数因子。</p>
+  <h3 id="nesterov">为什么 Nesterov 能改善指数？</h3>
+  <p>对 Nesterov，在 \(\eta_\rho=Ba\gg1\) 时做同样的代换，得到</p>
+  <div class="equation-card">\[\mathcal E_{\mathrm{Nesterov}}(D)\asymp(Da)^{-s}+\sigma^2B^{1/\beta-1}a^{1/\beta}.\]</div>
+  <p>换成每样本学习率之后，batch size 仍然留在噪声项里。因为 \(1/\beta-1&lt;0\)，固定 \(a\) 时，更大的 batch 会让这一项变小。</p>
+  <p>把学习和噪声两项配平：</p>
+  <div class="equation-card">\[\begin{aligned}D^{-s}a^{-s}&amp;\asymp B^{1/\beta-1}a^{1/\beta}\\a_*&amp;\asymp D^{-s\beta/(s\beta+1)}B^{(\beta-1)/(s\beta+1)}.\end{aligned}\]</div>
+  <p>再代回误差公式，并写成 \(B\asymp D^b\)：</p>
+  <div class="equation-card">\[\mathcal E_{\mathrm{Nesterov}}(D)\asymp D^{-\frac{s(1+(\beta-1)b)}{s\beta+1}}.\]</div>
+  <p>这就是 Nesterov 数据缩放指数中间上升的那一段。它适用于大有效学习率下的平衡点仍然可行时。等步数再次成为主要限制，指数就会接到和 Polyak 一样的 \(2s(1-b)\) 上。</p>
+</section>
+
+<section class="section" id="phase-diagram">
+  <h2>把不同 batch size 放在一起看</h2>
+  <p>令 \(B=D^{b+o(1)}\)，其中 \(b\in[0,1)\)。在稳定范围内把超参数调到最优后，将最终误差写成 \(D^{-r(b)+o(1)}\)。\(r\) 越大，增加数据带来的改善越明显。小量 \(o(1)\) 允许存在不改变主导幂次的因子。</p>
+  <p>三个转折点分别是</p>
+  <div class="equation-card">\[b_1=\frac{s}{s+1},\qquad b_2=\frac{2s+1/\beta}{2s+1+1/\beta},\qquad b_3=\frac{2s+1}{2s+2}.\]</div>
+  <p>我们已经看到 \(b_1\) 和 \(b_3\) 的来源：它们分别是 SGD 和 Polyak 的临界 batch 指数。剩下的 \(b_2\)，是 Nesterov 上升的那一段与步数限制相遇的位置。</p>
+  <p>下面的图把三种方法放在同一组坐标里。调整 \(b\)，可以比较不同 batch 规模下的表现；调整 \(s\) 和 \(\beta\)，则是在改变学习问题本身。</p>
+  {{EXPLORER}}
+  <ul class="regime-list">
+    <li><strong>小 batch，\(b\leq b_1\)。</strong>三种方法的指数都是 \(s/(s+1)\)。动量可能改变常数因子，但不会改善这个指数。</li>
+    <li><strong>更大的 batch，\(b_1&lt;b&lt;b_3\)。</strong>Nesterov 的指数最好，Polyak 其次，SGD 最后。Nesterov 在 \(b_2\) 处达到最高点。</li>
+    <li><strong>非常大的 batch，\(b\geq b_3\)。</strong>Polyak 和 Nesterov 的指数都是 \(2s(1-b)\)，SGD 则是 \(s(1-b)\)。Batch 继续增大时，三种方法的表现都会变差。</li>
+  </ul>
+  <details class="theory"><summary>曲线的完整公式</summary><div>
+    <div class="math-block">\[r_{\mathrm{SGD}}(b)=\min\left\{\frac{s}{s+1},s(1-b)\right\},\]</div>
+    <div class="math-block">\[r_{\mathrm{Polyak}}(b)=\min\left\{\frac{s}{s+1},2s(1-b)\right\},\]</div>
+    <div class="math-block">\[r_{\mathrm{Nesterov}}(b)=\begin{cases}\frac{s}{s+1},&amp;b&lt;b_1,\\[2pt]\frac{s(1+(\beta-1)b)}{s\beta+1},&amp;b_1\leq b&lt;b_2,\\[2pt]2s(1-b),&amp;b_2\leq b&lt;1.\end{cases}\]</div>
+    <p>这些是最优调参后的渐近指数，完整结果见论文定理 6.3。</p>
+  </div></details>
 </section>
 
 <section class="section" id="experiments">
-  <p class="section__label">06</p>
-  <h2>数值验证</h2>
-  <h3 class="subhead">固定数据预算下的 batch-size 相图</h3>
-  <p>我们首先在有限数据预算下验证理论预测的三个区间。固定 \(D=2^{14}\)，并对每个 batch size \(B\) 调整 \((\eta,\rho)\)，使最终超额风险最小。在小 batch 区间，SGD、Polyak 和 Nesterov 的风险几乎相同。随着 \(B\) 增大，SGD 的表现最先下降，而 Polyak 在更宽的范围内保持小 batch 的表现，体现了其更大的临界 batch size。</p>
-  <p>在大 batch 区间，Nesterov 的风险继续降低，低于 SGD 和 Polyak 能达到的最优水平，随后才在超大 batch 区间上升。因此，Polyak 扩大了保持数据效率的 batch-size 范围，而 Nesterov 进一步提高了数据效率。</p>
-  <h3 class="subhead">不同 batch-size 区间的数据缩放指数</h3>
-  <p>接下来，我们在各区间的代表性位置验证预测的数据缩放指数。继续采用 \((s,\beta)=(0.3,4)\)，选择 \(B\asymp1\)、\(B\asymp D^{0.4}\) 和 \(B\asymp D^{0.8}\)，分别代表小 batch、大 batch 和超大 batch。对于每个数据预算 \(D\)，我们按照理论给出的缩放关系设置 \((\eta,\rho)\)。</p>
-    <div class="result-triptych">
-    <figure class="paper-figure"><span class="plot-heading">小 Batch · \(B\asymp1\)</span><a href="assets/figures/small-batch.pdf" target="_blank" rel="noopener"><img src="assets/figures/small-batch.svg" loading="lazy" alt="小 batch 的数据缩放实验：三种方法具有相同指数。"/></a><figcaption>Nesterov = Polyak = SGD</figcaption></figure>
-    <figure class="paper-figure"><span class="plot-heading">大 Batch · \(B\asymp D^{0.4}\)</span><a href="assets/figures/large-batch.pdf" target="_blank" rel="noopener"><img src="assets/figures/large-batch.svg" loading="lazy" alt="大 batch 的数据缩放实验：Nesterov 指数最好，其次是 Polyak 和 SGD。"/></a><figcaption>Nesterov &gt; Polyak &gt; SGD</figcaption></figure>
-    <figure class="paper-figure"><span class="plot-heading">超大 Batch · \(B\asymp D^{0.8}\)</span><a href="assets/figures/ultra-batch.pdf" target="_blank" rel="noopener"><img src="assets/figures/ultra-batch.svg" loading="lazy" alt="超大 batch 的数据缩放实验：两种动量方法指数相同，均优于 SGD。"/></a><figcaption>Nesterov = Polyak &gt; SGD</figcaption></figure>
+  <h2>训练曲线里能看到什么？</h2>
+  <p>前面的指数描述数据量很大时的趋势。我们也在同一个回归模型里做了模拟，看看数据有限时，这些预测能不能对上。</p>
+  <h3 id="fixed-data">同样的数据，换不同的 batch size</h3>
+  <p>固定 \(D=2^{14}\)，每个 batch size 下都重新调学习率和动量，让最终误差尽量低。小 batch 时，SGD、Polyak 和 Nesterov 的误差几乎一样。Batch 逐渐增大，SGD 最先变差，Polyak 则能更久地保持之前的表现。</p>
+  <p>Nesterov 的误差会先下降，再转头上升。在下降的那段范围里，仅仅改变 batch size 并配合调参，就能让它从同样的数据里学到更多。</p>
+  <figure class="paper-figure"><a href="assets/figures/intro.pdf" target="_blank" rel="noopener"><img src="assets/figures/intro.svg" width="1500" height="535" loading="lazy" alt="Batch size 增大时，理论预测的数据缩放指数和实验中的最终误差。"/></a><figcaption><b>图 2.</b> 左图是理论预测的数据缩放指数，越高越好；右图是 \(D=2^{14}\)、\((s,\beta)=(0.3,4)\) 时，最优调参后的最终误差，越低越好。两张图都能看出三种方法在哪里分开，以及两种动量方法在哪里重新接近。来源：论文图 1。</figcaption></figure>
+  <h3 id="growing-data">增加数据，再换三种 batch 增长规则</h3>
+  <p>接着，采用 \((s,\beta)=(0.3,4)\) 并增加数据预算。让 batch 保持常数量级、按 \(D^{0.4}\) 增长，或按 \(D^{0.8}\) 增长，分别落在前面的三个范围里。每次训练的学习率和动量，按理论给出的缩放规则设置。</p>
+  <div class="result-triptych">
+    <figure class="paper-figure"><span class="plot-heading">小 Batch · \(B\asymp1\)</span><a href="assets/figures/small-batch.pdf" target="_blank" rel="noopener"><img src="assets/figures/small-batch.svg" loading="lazy" alt="小 batch 的数据缩放：三种方法具有相同指数。"/></a><figcaption>三种方法的斜率一样。</figcaption></figure>
+    <figure class="paper-figure"><span class="plot-heading">大 Batch · \(B\asymp D^{0.4}\)</span><a href="assets/figures/large-batch.pdf" target="_blank" rel="noopener"><img src="assets/figures/large-batch.svg" loading="lazy" alt="大 batch 的数据缩放：Nesterov 指数最好，其次是 Polyak 和 SGD。"/></a><figcaption>增加数据，Nesterov 收益最大。</figcaption></figure>
+    <figure class="paper-figure"><span class="plot-heading">非常大的 Batch · \(B\asymp D^{0.8}\)</span><a href="assets/figures/ultra-batch.pdf" target="_blank" rel="noopener"><img src="assets/figures/ultra-batch.svg" loading="lazy" alt="非常大的 batch 下，两种动量方法指数相同，均优于 SGD。"/></a><figcaption>两种动量方法都领先 SGD。</figcaption></figure>
   </div>
-  <p class="figure-note">点表示实验测得的最终超额风险，虚线表示理论预测的缩放指数。三个 batch-size 区间内的实验斜率均复现了理论预测的排序。</p>
+  <p class="figure-note"><b>图 3.</b> 数据增加时的最终误差。点是实验结果，虚线是理论预测的斜率。三个范围里的模拟结果，都符合预测的排序。来源：我们的论文。</p>
 </section>
 
 <section class="section" id="takeaway">
-  <p class="section__label">07</p>
-  <h2>结论与讨论</h2>
-  <p>我们对大 batch、one-pass 训练中的 Polyak 和 Nesterov 动量进行了统一分析，刻画了风险稳定性、风险动力学以及最优数据缩放。一个核心结论是，动量的收益显著依赖于 batch size。在小 batch 区间，两种方法都不改善普通 SGD 的数据缩放指数。随着 batch size 增大，Polyak 在比 SGD 显著更宽的 batch-size 范围内保持小 batch 的最优数据缩放指数，而 Nesterov 在大 batch 区间进一步改善数据缩放指数。在超大 batch 区间，训练受到顺序更新次数的限制，两种动量方法重新呈现相同的信号受限缩放。</p>
-  <p>这些结果表明，学习率、batch size 和动量应当被联合设计。稳定性条件决定了在给定学习率和 batch size 下，动量能够增加到什么程度；缩放规律则量化了更快的信号学习与更强的噪声累积之间的权衡。将这一框架推广到随时间变化的学习率、batch size 和动量系数，有望为大规模训练中这些超参数的联合缩放与调度提供理论指导。</p>
+  <h2>几个值得记住的点</h2>
+  <p>Polyak 和 Nesterov 都通过有效学习率 \(\eta/(1-\rho)\) 加快学习。Polyak 保留了 SGD 在学习和噪声之间的最佳平衡，但可以在更大的 batch 下达到它。Nesterov 则在大有效学习率下降低噪声代价，连这个平衡点本身也改善了。</p>
+  <p>Batch size 决定了我们能不能用上这些收益。小 batch 时，三种方法的数据缩放指数一样；中间这段范围，动量有了发挥空间；batch 非常大时，两种动量方法最终都会受限于更新次数太少。</p>
+  <p>这里讨论的是 one-pass 核回归，每次训练中的超参数保持固定。这些结果给了我们一个理由，把学习率、batch size 和动量放在一起考虑。进一步允许它们随训练过程变化，是一个自然的下一步。</p>
 </section>

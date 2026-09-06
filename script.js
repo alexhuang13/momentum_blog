@@ -40,7 +40,7 @@ function drawChart() {
   for (const name of ['sgd', 'polyak', 'nesterov']) $(`#rate-${name}`).textContent = r[name].toFixed(3);
   const small = b <= b1, large = b > b1 && b < b3;
   $('#regime-name').textContent = zh ? (small ? 'I · 小 Batch' : large ? 'II · 大 Batch' : 'III · 超大 Batch') : (small ? 'I · Small batch' : large ? 'II · Large batch' : 'III · Ultra-large batch');
-  $('#regime-description').textContent = zh ? (small ? '三种方法达到相同的最优数据缩放指数。' : large ? 'Nesterov 优于 Polyak，Polyak 优于 SGD。' : 'Polyak 和 Nesterov 具有相同指数，均优于 SGD。') : (small ? 'All three methods achieve the same optimal data-scaling exponent.' : large ? 'Nesterov outperforms Polyak, which in turn outperforms SGD.' : 'Polyak and Nesterov share the same exponent and outperform SGD.');
+  $('#regime-description').textContent = zh ? (small ? '增加数据时，三种方法的误差按同样的指数下降。' : large ? '增加数据带来的改善：Nesterov 最快，Polyak 其次，SGD 最慢。' : '两种动量方法的指数一样，都比 SGD 更好。') : (small ? 'More data lowers error with the same exponent for all three.' : large ? 'Nesterov gains the most from more data, then Polyak, then SGD.' : 'Both momentum methods scale alike and beat SGD.');
   const L = 61, R = 774, T = 51;
   const maxY = Math.max(0.5, Math.ceil(rates(s, beta, b2).nesterov * 1.1 * 10) / 10);
   // The vertical unit length is 1.2 times the horizontal unit length.

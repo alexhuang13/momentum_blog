@@ -9,7 +9,7 @@ Research blog by Jia-Nan Wang, Zixun Huang, Kairui Li, and Lei Wu.
 - [Paper](https://arxiv.org/pdf/2609.02728)
 - [Additional public site](https://momentum-scaling-notes.zixunh.chatgpt.site/)
 
-The article follows the manuscript's introduction, risk stability, risk dynamics, data scaling, mechanism, numerical validations, and conclusion. English prose largely retains the manuscript's wording; the Chinese page follows the same text. The layout is adapted from FlowBalance-Blog.
+The article develops the topic step by step: data budget and regression setup, optimizer updates, effective learning rate, stability, learning and noise, then data-scaling derivations and training curves. Both languages use a centered single column, a collapsible nested table of contents, and equations directly in the text. The reading-time estimate and table of contents are generated from the article sources. The reading layout and tutorial structure take inspiration from [Lil’Log](https://lilianweng.github.io/posts/2021-07-11-diffusion-models/).
 
 ## Local development
 
