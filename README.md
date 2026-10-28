@@ -2,7 +2,7 @@
 
 **Polyak enlarges the critical batch size, Nesterov improves data efficiency.**
 
-Research blog by Jia-Nan Wang, Zixun Huang, Kairui Li, and Lei Wu.
+Research blog by Jia-Nan Wang, Zixun Huang, Kairui Li, Zilin Wang, and Lei Wu.
 
 - [English website](https://alexhuang13.github.io/momentum_blog/)
 - [中文版](https://alexhuang13.github.io/momentum_blog/zh.html)
